@@ -1,14 +1,63 @@
 from random import shuffle, choice
 from itertools import product, repeat, chain
+from enum import Enum
+from typing import Iterable, Iterator, Sized, Union
 
 
-COLORS = ['red', 'yellow', 'green', 'blue']
-ALL_COLORS = COLORS + ['black']
-NUMBERS = list(range(10)) + list(range(1, 10))
-SPECIAL_CARD_TYPES = ['skip', 'reverse', '+2']
-COLOR_CARD_TYPES = NUMBERS + SPECIAL_CARD_TYPES * 2
-BLACK_CARD_TYPES = ['wildcard', '+4']
-CARD_TYPES = NUMBERS + SPECIAL_CARD_TYPES + BLACK_CARD_TYPES
+# COLORS = ['red', 'yellow', 'green', 'blue']
+# ALL_COLORS = COLORS + ['black']
+# NUMBERS = list(range(10)) + list(range(1, 10))
+# SPECIAL_CARD_TYPES = ['skip', 'reverse', '+2']
+# COLOR_CARD_TYPES = NUMBERS + SPECIAL_CARD_TYPES * 2
+# BLACK_CARD_TYPES = ['wildcard', '+4']
+# CARD_TYPES = NUMBERS + SPECIAL_CARD_TYPES + BLACK_CARD_TYPES
+
+
+class CardColor(Enum):
+    ...
+
+
+class NormalCardColor(CardColor):
+    RED = 'red'
+    YELLOW = 'yellow'
+    GREEN = 'green'
+    BLUE = 'blue'
+
+
+class BlackCardColor(CardColor):
+    BLACK = 'black'
+
+
+class CardType(Enum):
+    ...
+
+
+class ColorCardType(CardType):
+    ...
+
+
+class NumberCardType(ColorCardType):
+    N0 = '0'
+    N1 = '1'
+    N2 = '2'
+    N3 = '3'
+    N4 = '4'
+    N5 = '5'
+    N6 = '6'
+    N7 = '7'
+    N8 = '8'
+    N9 = '9'
+
+
+class SpecialCardType(ColorCardType):
+    SKIP = 'skip'
+    REVERSE = 'reverse'
+    PLUS2 = '+2'
+
+
+class BlackCardType(CardType):
+    WILDCARD = 'wildcard'
+    PLUS4 = '+4'
 
 
 class UnoCard:
@@ -18,69 +67,72 @@ class UnoCard:
     color: string
     card_type: string/int
 
-    >>> card = UnoCard('red', 5)
+    >>> card = UnoCard(CardColor.RED, CardType.N0)
     """
-    def __init__(self, color, card_type):
-        self._validate(color, card_type)
+
+    def __init__(self, color: CardColor, card_type: CardType):
+        UnoCard.__validate(color, card_type)
         self.color = color
-        self.card_type = card_type
-        self.temp_color = None
+        self.type = card_type
+        # self.temp_color = None
 
-    def __repr__(self):
-        return '<UnoCard object: {} {}>'.format(self.color, self.card_type)
-
-    def __str__(self):
-        return '{}{}'.format(self.color_short, self.card_type_short)
-
-    def __eq__(self, other):
-        return self.color == other.color and self.card_type == other.card_type
-
-    def _validate(self, color, card_type):
+    @staticmethod
+    def __validate(color: CardColor, card_type: CardType) -> None:
         """
         Check the card is valid, raise exception if not.
         """
-        if color not in ALL_COLORS:
-            raise ValueError('Invalid color')
-        if color == 'black' and card_type not in BLACK_CARD_TYPES:
-            raise ValueError('Invalid card type')
-        if color != 'black' and card_type not in COLOR_CARD_TYPES:
-            raise ValueError('Invalid card type')
+        if color not in CardColor:
+            raise ValueError(f'Invalid color [{color}]!')
+        if (
+                (color == CardColor.BLACK and card_type not in BlackCardType) or
+                (color != CardColor.BLACK and card_type not in ColorCardType)
+        ):
+            raise ValueError(f'Invalid card [{color} {card_type}]!')
 
-    @property
-    def color_short(self):
-        return self.color[0].upper()
+    def __repr__(self):
+        return f'<{UnoCard.__name__} object: {self.color:6} {self.type}>'
 
-    @property
-    def card_type_short(self):
-        if self.card_type in ('skip', 'reverse', 'wildcard'):
-            return self.card_type[0].upper()
-        else:
-            return self.card_type
+    def __str__(self):
+        return f'{self.color} {self.type}'
 
-    @property
-    def _color(self):
-        return self.temp_color if self.temp_color else self.color
+    def __eq__(self, other):
+        return self.color == other.color and self.type == other.card_type
 
-    @property
-    def temp_color(self):
-        return self._temp_color
+    # @property
+    # def color_short(self):
+    #     return self.color[0].upper()
+    #
+    # @property
+    # def card_type_short(self):
+    #     if self.card_type in ('skip', 'reverse', 'wildcard'):
+    #         return self.card_type[0].upper()
+    #     else:
+    #         return self.card_type
+    #
+    # @property
+    # def _color(self):
+    #     return self.temp_color if self.temp_color else self.color
+    #
+    # @property
+    # def temp_color(self):
+    #     return self._temp_color
+    #
+    # @temp_color.setter
+    # def temp_color(self, color):
+    #     if color is not None:
+    #         if color not in COLORS:
+    #             raise ValueError('Invalid color')
+    #     self._temp_color = color
 
-    @temp_color.setter
-    def temp_color(self, color):
-        if color is not None:
-            if color not in COLORS:
-                raise ValueError('Invalid color')
-        self._temp_color = color
-
-    def playable(self, other):
+    def playable(self, other: 'UnoCard') -> bool:
         """
         Return True if the other card is playable on top of this card,
         otherwise return False
         """
         return (
-            self._color == other.color or
-            self.card_type == other.card_type or
-            other.color == 'black'
+                self.color == other.color or
+                self.type == other.type or
+                other.color == 'black'
         )
 
 
@@ -92,34 +144,39 @@ class UnoPlayer:
     cards: list of 7 UnoCards
     player_id: int/str (default: None)
 
-    >>> cards = [UnoCard('red', n) for n in range(7)]
+    >>> cards = [*repeat(UnoCard(NormalCardColor.RED, NumberCardType.N0), 7)]
     >>> player = UnoPlayer(cards)
     """
-    def __init__(self, cards, player_id=None):
-        if len(cards) != 7:
-            raise ValueError(
-                'Invalid player: must be initalised with 7 UnoCards'
-            )
-        if not all(isinstance(card, UnoCard) for card in cards):
-            raise ValueError(
-                'Invalid player: cards must all be UnoCard objects'
-            )
+
+    def __init__(self, cards: Iterable[UnoCard] + Sized,
+                 player_id: Union[int, str] = None):
         self.hand = cards
         self.player_id = player_id
 
+    @staticmethod
+    def __validate(cards) -> None:
+        card_size = len(cards)
+        if card_size != 7:
+            raise ValueError(f'Invalid number of cards: '
+                             f'expected 7 UnoCards, '
+                             f'but got [{card_size}]!')
+        if not all(isinstance(card, UnoCard) for card in cards):
+            raise ValueError('Invalid card types: cards must all be UnoCard objects!')
+        del card_size
+
     def __repr__(self):
         if self.player_id is not None:
-            return '<UnoPlayer object: player {}>'.format(self.player_id)
+            return f'<UnoPlayer object: player id [{self.player_id}]>'
         else:
-            return '<UnoPlayer object>'
+            return f'<UnoPlayer object>'
 
     def __str__(self):
         if self.player_id is not None:
-            return str(self.player_id)
+            return f'Player {self.player_id}'
         else:
             return repr(self)
 
-    def can_play(self, current_card):
+    def can_play(self, current_card) -> bool:
         """
         Return True if the player has any playable cards (on top of the current
         card provided), otherwise return False
@@ -127,7 +184,7 @@ class UnoPlayer:
         return any(current_card.playable(card) for card in self.hand)
 
 
-class UnoGame:
+class UnoGame(Iterator):
     """
     Represents an Uno game.
 
@@ -136,7 +193,8 @@ class UnoGame:
 
     >>> game = UnoGame(5)
     """
-    def __init__(self, players, random=True):
+
+    def __init__(self, players: int, random: bool = True):
         if not isinstance(players, int):
             raise ValueError('Invalid game: players must be integer')
         if not 2 <= players <= 15:
@@ -298,6 +356,7 @@ class ReversibleCycle:
     >>> next(rc)
     2
     """
+
     def __init__(self, iterable):
         self._items = list(iterable)
         self._pos = None
